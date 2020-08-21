@@ -62,10 +62,11 @@ class SpreadsSimpleBackoff(ScriptBase):
         It is intended to be implemented by the derived class of this class.
         """
         self.bought_orders.append(event)
+        extra_bought = max(0, len(self.bought_orders) - len(self.sold_orders))
 
         # reincreasing the spread to avoid staying too close to mid price
         notif = f"bid_spread: {self.pmm_parameters.bid_spread} ->"
-        self.pmm_parameters.bid_spread *= 2  # spread computation will activate this modified spread
+        self.pmm_parameters.bid_spread *= extra_bought + 1  # increasing spread proportionally to the extra bought orders
         self.notify(f"{notif} {self.pmm_parameters.bid_spread}")
 
     def on_sell_order_completed(self, event: SellOrderCompletedEvent):
@@ -74,10 +75,11 @@ class SpreadsSimpleBackoff(ScriptBase):
         It is intended to be implemented by the derived class of this class.
         """
         self.sold_orders.append(event)
+        extra_sold = max(0, len(self.sold_orders) - len(self.bought_orders))
 
         # reincreasing the spread to avoid staying too close to mid price
         notif = f"ask_spread: {self.pmm_parameters.ask_spread} ->"
-        self.pmm_parameters.ask_spread *= 2  # spread computation will activate this modified spread
+        self.pmm_parameters.ask_spread *= extra_sold + 1  # increasing spread proportionally to the extra sold orders
         self.notify(f"{notif} {self.pmm_parameters.ask_spread}")
 
     def on_order_refresh_period_ends(self):
