@@ -90,7 +90,7 @@ class SpreadsSimpleBackoff(ScriptBase):
 
         if bd == 0:
             return  # early return if we cannot compute min_profit_price:
-            # better not change the spread if we dont know what we are doing...
+            # better not change the spread if we dont yet know what we are doing...
 
         min_profit_price = abs(qd / bd)  # if neg -> price has to be positive anyway, if pos -> already fine
         self.notify(f"min_profit_price: {min_profit_price}")
@@ -98,6 +98,9 @@ class SpreadsSimpleBackoff(ScriptBase):
         min_spread = abs(self.mid_price - min_profit_price) / self.mid_price
         self.notify(f"min_spread: {min_spread}")
         # min_spread prevents from setting spreads where we will lose money...
+        # Note: we use this symmetrically (dont sell too cheap & don't buy too high)
+        # for a lack of a better heuristic here...
+        # we use the number of order to dynamically balance the spread (implies constant amount is needed !...)
 
         if len(self.sold_orders) > len(self.bought_orders):
             notif = "More sold than bought!"
