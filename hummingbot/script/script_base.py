@@ -7,7 +7,13 @@ from operator import itemgetter
 from .script_interface import OnTick, OnStatus, PMMParameters, CallNotify, CallLog
 from hummingbot.core.event.events import (
     BuyOrderCompletedEvent,
-    SellOrderCompletedEvent
+    SellOrderCompletedEvent,
+    OrderCancelledEvent,
+    OrderFilledEvent,
+    MarketOrderFailureEvent,
+    OrderExpiredEvent,
+    BuyOrderCreatedEvent,
+    SellOrderCreatedEvent
 )
 
 
@@ -61,6 +67,18 @@ class ScriptBase:
                 self.on_buy_order_completed(item)
             elif isinstance(item, SellOrderCompletedEvent):
                 self.on_sell_order_completed(item)
+            elif isinstance(item, OrderFilledEvent):
+                self.on_order_filled(item)
+            elif isinstance(item, OrderCancelledEvent):
+                self.on_order_cancelled(item)
+            elif isinstance(item, MarketOrderFailureEvent):
+                self.on_order_failed(item)
+            elif isinstance(item, OrderExpiredEvent):
+                self.on_order_expired(item)
+            elif isinstance(item, BuyOrderCreatedEvent):
+                self.on_buy_order_created(item)
+            elif isinstance(item, SellOrderCreatedEvent):
+                self.on_sell_order_created(item)
             elif isinstance(item, OnStatus):
                 status_msg = self.on_status()
                 self.notify(f"Script status: {status_msg}")
@@ -137,6 +155,32 @@ class ScriptBase:
             changes.append(abs(samples[index] - samples[index - 1]) / samples[index - 1])
         return locate_function(changes)
 
+    def avg_price_delta(self, interval: int, length: int) -> Optional[Decimal]:
+        """
+        :returns None if there is not enough samples, otherwise the average mid price change.
+        """
+        return self.locate_central_price_delta(interval, length, mean)
+
+    def median_price_delta(self, interval: int, length: int) -> Optional[Decimal]:
+        """
+        :returns None if there is not enough samples, otherwise the median mid price change.
+        """
+        return self.locate_central_price_delta(interval, length, median)
+
+    def locate_central_price_delta(self, interval: int, length: int, locate_function: Callable) \
+            -> Optional[Decimal]:
+        """
+        same as for volatility but without abs to get the trend direction...
+        """
+        # We need sample size of length + 1, as we need a previous value to calculate the change
+        samples = self.take_samples(self.mid_prices, interval, length + 1)
+        if samples is None:
+            return None
+        changes = []
+        for index in range(1, len(samples)):
+            changes.append((samples[index] - samples[index - 1]) / samples[index - 1])
+        return locate_function(changes)
+
     @staticmethod
     def round_by_step(a_number: Decimal, step_size: Decimal):
         """
@@ -145,7 +189,7 @@ class ScriptBase:
         :param step_size: The step size.
         :returns rounded number.
         """
-        return (a_number // step_size) * step_size
+        return (a_number / step_size) * step_size
 
     @staticmethod
     def take_samples(a_list: List[Any], interval: int, length: int) -> Optional[List[any]]:
@@ -188,6 +232,24 @@ class ScriptBase:
         Is called upon a sell order is completely filled.
         It is intended to be implemented by the derived class of this class.
         """
+        pass
+
+    def on_order_filled(self, event: OrderFilledEvent):
+        pass
+
+    def on_order_cancelled(self, event: OrderCancelledEvent):
+        pass
+
+    def on_order_failed(self, event: MarketOrderFailureEvent):
+        pass
+
+    def on_order_expired(self, event: OrderExpiredEvent):
+        pass
+
+    def on_buy_order_created(self, event: BuyOrderCreatedEvent):
+        pass
+
+    def on_sell_order_create(self, event: SellOrderCreatedEvent):
         pass
 
     def on_status(self) -> str:
