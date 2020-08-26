@@ -16,7 +16,6 @@ class SpreadsSimpleBackoff(ScriptBase):
 
     def __init__(self):
         super().__init__()
-        self.wasted_cycle = 0
         self.tickcounter = 0
 
         self.bought_orders = []
@@ -50,7 +49,7 @@ class SpreadsSimpleBackoff(ScriptBase):
             if self.tickcounter == int(
                     self.pmm_parameters.order_refresh_time):  # TMP better to be triggered on event by strategy...
                 self.tickcounter = 0  # reset
-                # order refresh period ended
+                # order refresh period ended  # TODO : hookup to on_order_cancel()
                 self.on_order_refresh_period_ends()
 
         except Exception:
@@ -83,9 +82,6 @@ class SpreadsSimpleBackoff(ScriptBase):
         self.notify(f"{notif} {self.pmm_parameters.ask_spread}")
 
     def on_order_refresh_period_ends(self):
-        if self.wasted_cycle is None:
-            self.wasted_cycle = 0
-
         bd, qd = self.compute_trade_delta()
 
         if bd == 0:
@@ -104,7 +100,7 @@ class SpreadsSimpleBackoff(ScriptBase):
 
         if len(self.sold_orders) > len(self.bought_orders):
             notif = "More sold than bought!"
-            if self.pmm_parameters.bid_spread - self.pmm_parameters.order_refresh_tolerance_pct > min_spread:
+            if self.pmm_parameters.bid_spread - self.pmm_parameters.order_refresh_tolerance_pct > min_spread / 2:
                 notif = f"{notif} bid_spread: {self.pmm_parameters.bid_spread} ->"
                 self.pmm_parameters.bid_spread -= self.pmm_parameters.order_refresh_tolerance_pct  # reducing bid spread by significant amount
                 notif = f"{notif} {self.pmm_parameters.bid_spread}"
@@ -112,30 +108,27 @@ class SpreadsSimpleBackoff(ScriptBase):
 
         elif len(self.bought_orders) > len(self.sold_orders):
             notif = "More bought than sold!"
-            if self.pmm_parameters.ask_spread - self.pmm_parameters.order_refresh_tolerance_pct > min_spread:
+            if self.pmm_parameters.ask_spread - self.pmm_parameters.order_refresh_tolerance_pct > min_spread / 2:
                 notif = f"{notif} ask_spread: {self.pmm_parameters.ask_spread} ->"
                 self.pmm_parameters.ask_spread -= self.pmm_parameters.order_refresh_tolerance_pct  # reducing ask spread by significant amount
                 notif = f"{notif} {self.pmm_parameters.ask_spread}"
             self.notify(notif)
 
-        elif self.wasted_cycle > 5:  # This is effectively a factor of order_refresh_time
+        else:
             notif = ""
 
             # reducing total spread by significant amount
-            if self.pmm_parameters.ask_spread - Decimal(0.5) * self.pmm_parameters.order_refresh_tolerance_pct > min_spread:
+            if self.pmm_parameters.ask_spread - Decimal(0.5) * self.pmm_parameters.order_refresh_tolerance_pct > min_spread / 2:
                 notif = f"{notif} ask_spread: {self.pmm_parameters.ask_spread} ->"
                 self.pmm_parameters.ask_spread -= Decimal(0.5) * self.pmm_parameters.order_refresh_tolerance_pct  # reducing bid spread by significant amount
                 notif = f"{notif} {self.pmm_parameters.ask_spread}"
 
-            if self.pmm_parameters.bid_spread - Decimal(0.5) * self.pmm_parameters.order_refresh_tolerance_pct > min_spread:
+            if self.pmm_parameters.bid_spread - Decimal(0.5) * self.pmm_parameters.order_refresh_tolerance_pct > min_spread / 2:
                 notif = f"{notif} bid_spread: {self.pmm_parameters.bid_spread} ->"
                 self.pmm_parameters.bid_spread -= Decimal(0.5) * self.pmm_parameters.order_refresh_tolerance_pct
                 notif = f"{notif} {self.pmm_parameters.bid_spread}"
 
             self.notify(notif)
-            self.wasted_cycle = 0
-        else:
-            self.wasted_cycle += 1
 
     def on_order_cancelled(self, event: OrderCancelledEvent):
         # TODO : is it working yet ?
