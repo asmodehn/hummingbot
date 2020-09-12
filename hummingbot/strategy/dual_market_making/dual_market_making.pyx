@@ -74,6 +74,7 @@ cdef class DualMarketMakingStrategy(StrategyBase):
                  inventory_target_base_pct: Decimal = s_decimal_zero,
                  inventory_range_multiplier: Decimal = s_decimal_zero,
                  hanging_orders_enabled: bool = False,
+                 hanging_orders_trend_following: bool = False,
                  hanging_orders_cancel_pct: Decimal = Decimal("0.1"),
                  order_optimization_enabled: bool = False,
                  ask_order_optimization_depth: Decimal = s_decimal_zero,
@@ -110,6 +111,7 @@ cdef class DualMarketMakingStrategy(StrategyBase):
         self._inventory_target_base_pct = inventory_target_base_pct
         self._inventory_range_multiplier = inventory_range_multiplier
         self._hanging_orders_enabled = hanging_orders_enabled
+        self._hanging_orders_trend_following = hanging_orders_trend_following
         self._hanging_orders_cancel_pct = hanging_orders_cancel_pct
         self._order_optimization_enabled = order_optimization_enabled
         self._ask_order_optimization_depth = ask_order_optimization_depth
@@ -224,6 +226,14 @@ cdef class DualMarketMakingStrategy(StrategyBase):
     @hanging_orders_enabled.setter
     def hanging_orders_enabled(self, value: bool):
         self._hanging_orders_enabled = value
+
+    @property
+    def hanging_orders_trend_following(self) -> bool:
+        return self._hanging_orders_trend_following
+
+    @hanging_orders_trend_following.setter
+    def hanging_orders_trend_following(self, value: bool):
+        self._hanging_orders_trend_following = value
 
     @property
     def hanging_orders_cancel_pct(self) -> Decimal:
@@ -350,6 +360,11 @@ cdef class DualMarketMakingStrategy(StrategyBase):
     @property
     def active_non_hanging_orders(self) -> List[LimitOrder]:
         orders = [o for o in self.active_orders if o.client_order_id not in self._hanging_order_ids]
+        return orders
+
+    @property
+    def active_hanging_orders(self) -> List[LimitOrder]:
+        orders = [o for o in self.active_orders if o.client_order_id in self._hanging_order_ids]
         return orders
 
     @property
@@ -841,6 +856,7 @@ cdef class DualMarketMakingStrategy(StrategyBase):
 
         if self._hanging_orders_enabled:
             for other_order_id in active_sell_ids:
+                # TODO : somehow record filled order price, and other info to adjust corresponding hanging order later.
                 self._hanging_order_ids.append(other_order_id)
 
         self._filled_buys_balance += 1
@@ -884,6 +900,7 @@ cdef class DualMarketMakingStrategy(StrategyBase):
 
         if self._hanging_orders_enabled:
             for other_order_id in active_buy_ids:
+                # TODO : somehow record filled order price, and other info to adjust hanging order later.
                 self._hanging_order_ids.append(other_order_id)
 
         self._filled_sells_balance += 1
@@ -919,6 +936,19 @@ cdef class DualMarketMakingStrategy(StrategyBase):
             if ((self._market_info.market.name in self.RADAR_RELAY_TYPE_EXCHANGES) or
                     (self._market_info.market.name == "bamboo_relay" and not self._market_info.market.use_coordinator)):
                 return
+
+        # TODO : adjust hanging order depending on detected trend... (before computing cancellation !)
+        if self._hanging_orders_trend_following:
+            cdef:
+                list hanging_orders = self.active_hanging_orders
+            # TODO : get current price trend...
+            for h in hanging_orders:
+                # TODO:
+                # compute delta with current price
+                # if more than originally:
+                #   recover original price delta with current price
+                #   but keep a minimum of 0 spread from original matching filled order price
+                self.notify_hb_app(h)
 
         cdef:
             list active_orders = self.active_non_hanging_orders

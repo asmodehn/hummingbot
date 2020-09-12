@@ -203,6 +203,12 @@ dual_market_making_config_map = {
                   type_str="bool",
                   default=False,
                   validator=validate_bool),
+    "hanging_orders_trend_following":
+        ConfigVar(key="hanging_orders_trend_following",
+                  prompt="Do you want to allow hanging orders to trail the price? (Yes/No) >>> ",
+                  type_str="bool",
+                  default=False,
+                  validator=validate_bool),
     "hanging_orders_cancel_pct":
         ConfigVar(key="hanging_orders_cancel_pct",
                   prompt="At what spread percentage (from mid price) will hanging orders be canceled? "
@@ -210,6 +216,7 @@ dual_market_making_config_map = {
                   required_if=lambda: dual_market_making_config_map.get("hanging_orders_enabled").value,
                   type_str="decimal",
                   default=Decimal("10"),
+                  # TODO : if adjustable, make sure this is higher than total bid/ask spread (wouldnt make sense otherwise...)
                   validator=lambda v: validate_decimal(v, 0, 100, inclusive=False)),
     "order_optimization_enabled":
         ConfigVar(key="order_optimization_enabled",
