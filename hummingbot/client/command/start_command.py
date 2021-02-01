@@ -106,8 +106,8 @@ class StartCommand:
                 folder = dirname(script_file)
                 if folder == "":
                     script_file = SCRIPTS_PATH + script_file
-                if self.strategy_name != "pure_market_making":
-                    self._notify("Error: script feature is only available for pure_market_making strategy (for now).")
+                if self.strategy_name not in ["pure_market_making", "dual_market_making"]:
+                    self._notify("Error: script feature is only available for [pure/dual]_market_making strategy (for now).")
                 else:
                     self._script_iterator = ScriptIterator(script_file, list(self.markets.values()),
                                                            self.strategy, 0.1)
