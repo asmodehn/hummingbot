@@ -10,6 +10,12 @@ from hummingbot.strategy.pure_market_making import PureMarketMakingStrategy
 from hummingbot.core.event.events import (
     BuyOrderCompletedEvent,
     SellOrderCompletedEvent,
+    BuyOrderCreatedEvent,
+    SellOrderCreatedEvent,
+    OrderCancelledEvent,
+    OrderFilledEvent,
+    OrderExpiredEvent,
+    MarketOrderFailureEvent,
     MarketEvent,
 )
 from hummingbot.core.event.event_forwarder import SourceInfoEventForwarder
@@ -43,9 +49,20 @@ cdef class ScriptIterator(TimeIterator):
         self._queue_check_interval = queue_check_interval
         self._did_complete_buy_order_forwarder = SourceInfoEventForwarder(self._did_complete_buy_order)
         self._did_complete_sell_order_forwarder = SourceInfoEventForwarder(self._did_complete_sell_order)
+        self._did_create_buy_order_forwarder = SourceInfoEventForwarder(self._did_create_buy_order)
+        self._did_create_sell_order_forwarder = SourceInfoEventForwarder(self._did_create_sell_order)
+        self._did_fill_order_forwarder = SourceInfoEventForwarder(self._did_fill_order)
+        self._did_fail_order_forwarder = SourceInfoEventForwarder(self._did_fail_order)
+        self._did_cancel_order_forwarder = SourceInfoEventForwarder(self._did_cancel_order)
+        self._did_expire_order_forwarder = SourceInfoEventForwarder(self._did_expire_order)
+
         self._event_pairs = [
             (MarketEvent.BuyOrderCompleted, self._did_complete_buy_order_forwarder),
-            (MarketEvent.SellOrderCompleted, self._did_complete_sell_order_forwarder)
+            (MarketEvent.SellOrderCompleted, self._did_complete_sell_order_forwarder),
+            (MarketEvent.OrderCancelled, self._did_cancel_order_forwarder),
+            (MarketEvent.OrderFilled, self._did_fill_order_forwarder),
+            (MarketEvent.OrderExpired, self._did_expire_order_forwarder),
+            (MarketEvent.OrderFailure, self._did_fail_order_forwarder)
         ]
         self._ev_loop = asyncio.get_event_loop()
         self._parent_queue = Queue()
@@ -99,6 +116,42 @@ cdef class ScriptIterator(TimeIterator):
                                  event_tag: int,
                                  market: ExchangeBase,
                                  event: SellOrderCompletedEvent):
+        self._parent_queue.put(event)
+
+    def _did_fill_order(self,
+                        event_tag: int,
+                        market: MarketBase,
+                        event: OrderFilledEvent):
+        self._parent_queue.put(event)
+
+    def _did_cancel_order(self,
+                          event_tag: int,
+                          market: MarketBase,
+                          event: OrderCancelledEvent):
+        self._parent_queue.put(event)
+
+    def _did_fail_order(self,
+                        event_tag: int,
+                        market: MarketBase,
+                        event: MarketOrderFailureEvent):
+        self._parent_queue.put(event)
+
+    def _did_expire_order(self,
+                          event_tag: int,
+                          market: MarketBase,
+                          event: OrderExpiredEvent):
+        self._parent_queue.put(event)
+
+    def _did_create_buy_order(self,
+                              event_tag: int,
+                              market: MarketBase,
+                              event: BuyOrderCompletedEvent):
+        self._parent_queue.put(event)
+
+    def _did_create_sell_order(self,
+                               event_tag: int,
+                               market: MarketBase,
+                               event: SellOrderCompletedEvent):
         self._parent_queue.put(event)
 
     async def listen_to_child_queue(self):
